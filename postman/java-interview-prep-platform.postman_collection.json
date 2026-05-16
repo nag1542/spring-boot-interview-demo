@@ -1,0 +1,8 @@
+{
+  "info": {"name": "Java Interview Prep Platform", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "item": [
+    {"name":"Register","request":{"method":"POST","url":"{{baseUrl}}/api/auth/register"}},
+    {"name":"Login","request":{"method":"POST","url":"{{baseUrl}}/api/auth/login"}},
+    {"name":"Products","request":{"method":"GET","url":"{{baseUrl}}/api/products"}}
+  ]
+}
