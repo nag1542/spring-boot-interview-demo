@@ -1,0 +1,49 @@
+# Maven
+target/
+*.war
+*.ear
+*.jar
+dependency-reduced-pom.xml
+
+# Java
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+# Spring Boot / local configuration
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.yaml
+application-local.properties
+
+# IDEs and editors
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test and coverage output
+build/
+out/
+coverage/
+*.exec
+jacoco.exec
+
+# Logs and temporary files
+logs/
+*.tmp
+*.swp
+*.swo
+

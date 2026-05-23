@@ -14,8 +14,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> validation(MethodArgumentNotValidException ex) {
         return ResponseEntity.badRequest().body(Map.of("error", "validation_failed", "message", ex.getMessage()));
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<?> badRequest(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", "bad_request", "message", ex.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> generic(Exception ex) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "server_error", "message", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "server_error", "message", ex.getMessage()));
     }
 }

@@ -19,10 +19,24 @@ public class JwtService {
     private long expiration;
 
     public String generateToken(UserDetails user) {
-        return Jwts.builder().subject(user.getUsername()).issuedAt(new Date()).expiration(new Date(System.currentTimeMillis() + expiration)).signWith(key(), SignatureAlgorithm.HS256).compact();
+        return Jwts.builder().subject(user.getUsername()).issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expiration)).signWith(key(), SignatureAlgorithm.HS256)
+                .compact();
     }
-    public String extractUsername(String token) { return parse(token).getSubject(); }
-    public boolean isValid(String token, UserDetails user) { return extractUsername(token).equals(user.getUsername()) && parse(token).getExpiration().after(new Date()); }
-    private Claims parse(String token) { return Jwts.parser().verifyWith(key()).build().parseSignedClaims(token).getPayload(); }
-    private SecretKey key() { return Keys.hmacShaKeyFor(secret.getBytes()); }
+
+    public String extractUsername(String token) {
+        return parse(token).getSubject();
+    }
+
+    public boolean isValid(String token, UserDetails user) {
+        return extractUsername(token).equals(user.getUsername()) && parse(token).getExpiration().after(new Date());
+    }
+
+    private Claims parse(String token) {
+        return Jwts.parser().verifyWith(key()).build().parseSignedClaims(token).getPayload();
+    }
+
+    private SecretKey key() {
+        return Keys.hmacShaKeyFor(secret.getBytes());
+    }
 }
