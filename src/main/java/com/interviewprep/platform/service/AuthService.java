@@ -50,7 +50,7 @@ public class AuthService {
     public AuthDtos.AuthResponse login(AuthDtos.LoginRequest request) {
         authenticationManager
                 .authenticate(new UsernamePasswordAuthenticationToken(request.email(), request.password()));
-        var u = userRepository.findByEmail(request.email()).orElseThrow();
+        var u = userRepository.findByEmailIgnoreCase(request.email()).orElseThrow();
         String access = jwtService.generateToken(
                 org.springframework.security.core.userdetails.User.withUsername(u.getEmail()).password(u.getPassword())
                         .authorities(u.getRoles().stream().map(Enum::name).toArray(String[]::new)).build());
@@ -59,7 +59,7 @@ public class AuthService {
 
     @Transactional
     public AuthDtos.AuthResponse refresh(AuthDtos.RefreshRequest request) {
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(request.refreshToken())
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenWithUserAndRoles(request.refreshToken())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
         if (refreshToken.isRevoked() || refreshToken.getExpiresAt().isBefore(Instant.now())) {
             throw new IllegalArgumentException("Refresh token is expired or revoked");

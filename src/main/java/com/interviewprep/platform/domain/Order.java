@@ -19,4 +19,8 @@ public class Order {
     private String customerEmail;
     private BigDecimal totalAmount;
     private Instant createdAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 }

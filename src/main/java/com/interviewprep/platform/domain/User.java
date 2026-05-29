@@ -2,6 +2,7 @@ package com.interviewprep.platform.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 @Entity
@@ -20,9 +21,13 @@ public class User {
     @Column(nullable = false)
     private String password;
     private String fullName;
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
     @Enumerated(EnumType.STRING)
     @Column(name = "role")
     private Set<Role> roles;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @Builder.Default
+    private Set<Order> orders = new LinkedHashSet<>();
 }

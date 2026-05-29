@@ -16,7 +16,7 @@ public class UserController {
 
     @GetMapping("/api/users/profile")
     public UserDtos.UserResponse profile(Authentication authentication) {
-        return userRepository.findByEmail(authentication.getName())
+        return userRepository.findByEmailIgnoreCase(authentication.getName())
                 .map(UserDtos.UserResponse::from)
                 .orElseThrow();
     }
@@ -24,6 +24,6 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/api/admin/users")
     public List<UserDtos.UserResponse> allUsers() {
-        return userRepository.findAll().stream().map(UserDtos.UserResponse::from).toList();
+        return userRepository.findAllWithRoles().stream().map(UserDtos.UserResponse::from).toList();
     }
 }

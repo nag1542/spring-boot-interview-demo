@@ -15,7 +15,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     private final UserRepository userRepository;
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        var u = userRepository.findByEmail(username).orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        var u = userRepository.findByEmailIgnoreCase(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
         var authorities = u.getRoles().stream().map(r -> new SimpleGrantedAuthority(r.name())).toList();
         return new User(u.getEmail(), u.getPassword(), authorities);
     }
