@@ -6,6 +6,8 @@ import com.interviewprep.platform.repository.OrderRepository;
 import com.interviewprep.platform.repository.UserRepository;
 import com.interviewprep.platform.web.dto.UserDtos;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,12 +33,37 @@ public class NPlusOneDemoService {
          * - 10 order queries
          * = 11 total SQL queries for one API call
          */
+        
+
+        /*
+         * PROBLEM VARIANT: N+1 caused by FetchType / association access.
+         *
+         * This version does not call orderRepository.findByUserId(...) manually.
+         * It loads users and then accesses user.getOrders().
+         *
+         * Demo options:
+         * 1. Set User.orders to FetchType.LAZY:
+         *    - userRepository.findAll() loads users.
+         *    - user.getOrders() triggers one SQL query per user.
+         *
+         * 2. Set User.orders to FetchType.EAGER:
+         *    - Hibernate tries to load orders automatically when users are loaded.
+         *    - This often creates unexpected additional SQL and slower endpoints.
+         *
+         * Uncomment this block and comment the manual OrderRepository problem block above.
+         */
+
         // List<User> users = userRepository.findAll();
         // return users.stream()
         //         .map(user -> {
         //             List<Order> orders = orderRepository.findByUserId(user.getId());
         //             return UserDtos.UserWithOrdersResponse.from(user, orders);
         //         })
+        //         .toList();
+
+        // List<User> users = userRepository.findAll();
+        // return users.stream()
+        //         .map(user -> UserDtos.UserWithOrdersResponse.from(user, List.copyOf(user.getOrders())))
         //         .toList();
 
         /*
@@ -60,5 +87,19 @@ public class NPlusOneDemoService {
         return users.stream()
                 .map(user -> UserDtos.UserWithOrdersResponse.from(user, List.copyOf(user.getOrders())))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public UserDtos.UserOrdersPageResponse getUserOrdersPage(Long userId, Pageable pageable) {
+        Page<Order> ordersPage = orderRepository.findPageByUserId(userId, pageable);
+        return new UserDtos.UserOrdersPageResponse(
+                userId,
+                ordersPage.getNumber(),
+                ordersPage.getSize(),
+                ordersPage.getTotalElements(),
+                ordersPage.getTotalPages(),
+                ordersPage.isFirst(),
+                ordersPage.isLast(),
+                ordersPage.getContent().stream().map(UserDtos.OrderSummaryResponse::from).toList());
     }
 }

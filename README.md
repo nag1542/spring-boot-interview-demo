@@ -72,6 +72,7 @@ src/main/java/com/interviewprep/platform
 | Order | POST | `/api/orders` | Authenticated |
 | Order | GET | `/api/orders/{id}` | Authenticated |
 | Demo | GET | `/api/demo/n-plus-one/users-orders` | Admin |
+| Demo | GET | `/api/demo/users/{userId}/orders-page` | Demo |
 | Demo | GET | `/api/demo/payments/slow` | Public |
 | Demo | GET | `/api/demo/thread-pool-exhaustion/payments` | Admin |
 
@@ -269,6 +270,14 @@ Use the comments in that service to switch between:
 SQL logging is enabled in `application.yml` so the extra queries are visible in the console while recording the demo.
 
 User roles are mapped as lazy and fetched explicitly for authentication/profile endpoints. This keeps `user_roles` queries from hiding the intended `users -> orders` N+1 behavior in the demo logs.
+
+For users with hundreds or thousands of orders, avoid loading every order in the same response. Use the paginated endpoint:
+
+```text
+GET /api/demo/users/2/orders-page?page=0&size=5
+```
+
+`OrderRepository.findPageByUserId(...)` uses `Pageable` with an explicit `countQuery`, so the database returns only the requested page plus a lightweight total count.
 
 ## Thread Pool Exhaustion Demo
 

@@ -34,4 +34,15 @@ public class UserDtos {
             return new OrderSummaryResponse(order.getId(), order.getTotalAmount(), order.getCreatedAt());
         }
     }
+
+    public record UserOrdersPageResponse(
+            Long userId,
+            int page,
+            int size,
+            long totalElements,
+            int totalPages,
+            boolean first,
+            boolean last,
+            List<OrderSummaryResponse> orders) {
+    }
 }

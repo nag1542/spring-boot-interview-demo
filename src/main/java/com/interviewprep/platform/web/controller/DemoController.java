@@ -4,9 +4,12 @@ import com.interviewprep.platform.service.NPlusOneDemoService;
 import com.interviewprep.platform.service.ThreadPoolExhaustionDemoService;
 import com.interviewprep.platform.web.dto.UserDtos;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -40,6 +43,15 @@ public class DemoController {
         return nPlusOneDemoService.getUsersWithOrders();
     }
 
+    @GetMapping("/api/demo/users/{userId}/orders-page")
+    public UserDtos.UserOrdersPageResponse userOrdersPaginationDemo(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return nPlusOneDemoService.getUserOrdersPage(userId, pageable);
+    }
+
     @GetMapping("/api/demo/payments/slow")
     public Map<String, String> slowPaymentEndpoint(
             @RequestParam(defaultValue = "2000") long delayMs,
@@ -52,7 +64,7 @@ public class DemoController {
                 "thread", Thread.currentThread().getName());
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    
     @GetMapping("/api/demo/thread-pool-exhaustion/payments")
     public ThreadPoolExhaustionDemoService.ThreadPoolDemoResponse threadPoolExhaustionDemo(
             @RequestParam(defaultValue = "5") int calls,

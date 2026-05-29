@@ -507,6 +507,36 @@
           }
         },
         {
+          "name": "Paginated User Orders Demo",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/demo/users/2/orders-page?page=0&size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "demo",
+                "users",
+                "2",
+                "orders-page"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Pagination example for users with many orders. Uses Pageable and an explicit countQuery in OrderRepository."
+          }
+        },
+        {
           "name": "Slow Payment Endpoint",
           "request": {
             "method": "GET",

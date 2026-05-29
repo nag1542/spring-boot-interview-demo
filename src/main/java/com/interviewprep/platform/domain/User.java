@@ -27,6 +27,10 @@ public class User {
     @Column(name = "role")
     private Set<Role> roles;
 
+    // Production default should usually be LAZY for collections.
+    // Demo switch:
+    // - LAZY: N+1 appears when service code touches user.getOrders() inside a loop.
+    // - EAGER: Hibernate may load orders automatically while loading users, causing unexpected extra SQL.
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     @Builder.Default
     private Set<Order> orders = new LinkedHashSet<>();
