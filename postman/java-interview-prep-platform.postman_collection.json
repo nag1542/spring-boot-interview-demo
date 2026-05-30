@@ -12,6 +12,11 @@
       "type": "string"
     },
     {
+      "key": "actuatorBaseUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
       "key": "accessToken",
       "value": "",
       "type": "string"
@@ -566,7 +571,7 @@
           }
         },
         {
-          "name": "Thread Pool Exhaustion - Payment Calls",
+          "name": "Thread Pool - RestTemplate Blocking",
           "request": {
             "auth": {
               "type": "bearer",
@@ -580,7 +585,7 @@
             },
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/demo/thread-pool-exhaustion/payments?calls=5&delayMs=2000",
+              "raw": "{{baseUrl}}/api/demo/thread-pool-exhaustion/payments/rest-template?delayMs=2000",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -588,20 +593,117 @@
                 "api",
                 "demo",
                 "thread-pool-exhaustion",
-                "payments"
+                "payments",
+                "rest-template"
               ],
               "query": [
-                {
-                  "key": "calls",
-                  "value": "5"
-                },
                 {
                   "key": "delayMs",
                   "value": "2000"
                 }
               ]
             },
-            "description": "Admin-only endpoint that demonstrates blocking RestTemplate payment calls. Change calls/delayMs to increase pressure and compare RestTemplate, CompletableFuture, and WebClient implementations."
+            "description": "Blocking RestTemplate endpoint. Use Postman load testing with 10 users to show Tomcat request threads getting busy."
+          }
+        },
+        {
+          "name": "Thread Pool - CompletableFuture",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/demo/thread-pool-exhaustion/payments/completable-future?delayMs=2000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "demo",
+                "thread-pool-exhaustion",
+                "payments",
+                "completable-future"
+              ],
+              "query": [
+                {
+                  "key": "delayMs",
+                  "value": "2000"
+                }
+              ]
+            },
+            "description": "CompletableFuture endpoint backed by WebClient. The servlet request thread is released and the Mono is adapted using toFuture()."
+          }
+        },
+        {
+          "name": "Thread Pool - WebClient",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/demo/thread-pool-exhaustion/payments/webclient?delayMs=2000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "demo",
+                "thread-pool-exhaustion",
+                "payments",
+                "webclient"
+              ],
+              "query": [
+                {
+                  "key": "delayMs",
+                  "value": "2000"
+                }
+              ]
+            },
+            "description": "WebClient endpoint. Uses non-blocking outbound HTTP and async MVC response handling."
+          }
+        },
+        {
+          "name": "Actuator - Tomcat Busy Threads Metric",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{actuatorBaseUrl}}/actuator/metrics/tomcat.threads.busy",
+              "host": [
+                "{{actuatorBaseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "metrics",
+                "tomcat.threads.busy"
+              ]
+            },
+            "description": "Shows active/busy Tomcat request threads while the pressure demo is running."
           }
         }
       ]

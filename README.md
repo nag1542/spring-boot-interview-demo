@@ -74,7 +74,9 @@ src/main/java/com/interviewprep/platform
 | Demo | GET | `/api/demo/n-plus-one/users-orders` | Admin |
 | Demo | GET | `/api/demo/users/{userId}/orders-page` | Demo |
 | Demo | GET | `/api/demo/payments/slow` | Public |
-| Demo | GET | `/api/demo/thread-pool-exhaustion/payments` | Admin |
+| Demo | GET | `/api/demo/thread-pool-exhaustion/payments/rest-template` | Authenticated |
+| Demo | GET | `/api/demo/thread-pool-exhaustion/payments/completable-future` | Authenticated |
+| Demo | GET | `/api/demo/thread-pool-exhaustion/payments/webclient` | Authenticated |
 
 Use the JWT access token returned by login/register as:
 
@@ -135,20 +137,28 @@ http://localhost:8080/v3/api-docs
 
 Spring Boot Actuator is enabled for production-style observability. The health endpoint is public for probes, while the remaining actuator endpoints are protected by Spring Security.
 
+Actuator runs on a separate management port:
+
+```text
+http://localhost:8081
+```
+
+Tomcat's MBean registry is enabled so servlet container metrics such as `tomcat.threads.current` and `tomcat.threads.busy` are available.
+
 Redis health is disabled in the default local configuration because Redis is currently prepared for future caching features and is not a required runtime dependency for the existing API flows. If Redis becomes business-critical, enable `management.health.redis.enabled=true` and include it in the readiness group.
 
 | Endpoint | Purpose | Production Use |
 | --- | --- | --- |
-| `/actuator/health` | Overall service health | Load balancer or quick operational check |
-| `/actuator/health/liveness` | Confirms the JVM/application process is alive | Kubernetes liveness probe; restarts app if unhealthy |
-| `/actuator/health/readiness` | Confirms the app is ready to receive traffic | Kubernetes readiness probe; removes instance from traffic if DB/disk readiness fails |
-| `/actuator/info` | Application metadata | Confirms deployed service name, version, and description |
-| `/actuator/metrics` | Available Micrometer metric names | Discover JVM, HTTP, datasource, Tomcat, and process metrics |
-| `/actuator/metrics/{metric.name}` | Detailed metric values | Inspect specific metrics such as `http.server.requests`, `jvm.memory.used`, or `tomcat.threads.busy` |
-| `/actuator/prometheus` | Prometheus scrape format | Production metrics scraping by Prometheus/Grafana stacks |
-| `/actuator/loggers` | Runtime logger levels | Temporarily inspect or adjust logging during incidents |
-| `/actuator/threaddump` | Live JVM thread dump | Diagnose deadlocks, blocked threads, and thread pool exhaustion |
-| `/actuator/heapdump` | JVM heap dump | Memory leak investigation; restrict heavily in production |
+| `http://localhost:8081/actuator/health` | Overall service health | Load balancer or quick operational check |
+| `http://localhost:8081/actuator/health/liveness` | Confirms the JVM/application process is alive | Kubernetes liveness probe; restarts app if unhealthy |
+| `http://localhost:8081/actuator/health/readiness` | Confirms the app is ready to receive traffic | Kubernetes readiness probe; removes instance from traffic if DB/disk readiness fails |
+| `http://localhost:8081/actuator/info` | Application metadata | Confirms deployed service name, version, and description |
+| `http://localhost:8081/actuator/metrics` | Available Micrometer metric names | Discover JVM, HTTP, datasource, Tomcat, and process metrics |
+| `http://localhost:8081/actuator/metrics/{metric.name}` | Detailed metric values | Inspect specific metrics such as `http.server.requests`, `jvm.memory.used`, or `tomcat.threads.busy` |
+| `http://localhost:8081/actuator/prometheus` | Prometheus scrape format | Production metrics scraping by Prometheus/Grafana stacks |
+| `http://localhost:8081/actuator/loggers` | Runtime logger levels | Temporarily inspect or adjust logging during incidents |
+| `http://localhost:8081/actuator/threaddump` | Live JVM thread dump | Diagnose deadlocks, blocked threads, and thread pool exhaustion |
+| `http://localhost:8081/actuator/heapdump` | JVM heap dump | Memory leak investigation; restrict heavily in production |
 
 Important metrics to watch:
 
@@ -281,10 +291,12 @@ GET /api/demo/users/2/orders-page?page=0&size=5
 
 ## Thread Pool Exhaustion Demo
 
-The endpoint below demonstrates how blocking outbound calls can make a Spring Boot API feel slow under load:
+These endpoints demonstrate how blocking outbound calls can make a Spring Boot API feel slow under load:
 
 ```text
-GET /api/demo/thread-pool-exhaustion/payments?calls=5&delayMs=2000
+GET /api/demo/thread-pool-exhaustion/payments/rest-template?delayMs=2000
+GET /api/demo/thread-pool-exhaustion/payments/completable-future?delayMs=2000
+GET /api/demo/thread-pool-exhaustion/payments/webclient?delayMs=2000
 ```
 
 It calls a local slow payment endpoint:
@@ -293,13 +305,20 @@ It calls a local slow payment endpoint:
 GET /api/demo/payments/slow?delayMs=2000
 ```
 
-The active implementation in `ThreadPoolExhaustionDemoService` uses `RestTemplate`, which blocks the current request thread until each payment response comes back. Use the comments in that service to switch between:
+Each endpoint makes one slow payment call. Run 10 concurrent Postman users against each endpoint and compare `tomcat.threads.busy`, response time, and the returned thread names.
 
-- Problem: blocking `RestTemplate`
-- Solution 1: `CompletableFuture` with a bounded executor
-- Solution 2: `WebClient`
+- `rest-template`: blocks the incoming Tomcat request thread.
+- `completable-future`: releases the incoming request thread and adapts `WebClient`'s `Mono` using `toFuture()`.
+- `webclient`: releases the incoming request thread and uses non-blocking outbound HTTP.
 
-For a visible demo, call the endpoint with higher values such as `calls=20&delayMs=2000` and compare total response time and console thread names.
+For a visible Postman load-test demo, keep `server.tomcat.threads.max=5` and run 10 concurrent users. The RestTemplate endpoint should make the servlet thread pressure easiest to see.
+
+While Postman is running concurrent requests, check:
+
+```text
+GET http://localhost:8081/actuator/metrics/tomcat.threads.busy
+GET http://localhost:8081/actuator/metrics/tomcat.threads.current
+```
 
 ## Architecture
 

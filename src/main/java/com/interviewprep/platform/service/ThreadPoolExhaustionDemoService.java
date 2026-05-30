@@ -1,93 +1,109 @@
 package com.interviewprep.platform.service;
 
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.stream.IntStream;
 
 @Service
 public class ThreadPoolExhaustionDemoService {
     private final RestTemplate restTemplate;
     private final WebClient webClient;
-    private final Executor paymentDemoExecutor;
 
     @Value("${app.demo.payment-base-url:http://localhost:8080}")
     private String paymentBaseUrl;
 
     public ThreadPoolExhaustionDemoService(
             RestTemplate restTemplate,
-            WebClient webClient,
-            @Qualifier("paymentDemoExecutor") Executor paymentDemoExecutor) {
+            WebClient webClient) {
         this.restTemplate = restTemplate;
         this.webClient = webClient;
-        this.paymentDemoExecutor = paymentDemoExecutor;
     }
 
-    public ThreadPoolDemoResponse callSlowPayments(int calls, long delayMs) {
-        String url = paymentBaseUrl + "/api/demo/payments/slow?delayMs=" + delayMs;
+    public ThreadPoolDemoResponse callSlowPaymentWithRestTemplate(long delayMs, String requestThread) {
         Instant startedAt = Instant.now();
 
         /*
          * PROBLEM: RestTemplate blocks the request thread.
          *
-         * Every outbound payment call holds a servlet thread until the remote service responds.
-         * Under load, enough blocked servlet threads can exhaust the embedded Tomcat request pool.
+         * The same Tomcat request thread that entered the controller waits here until the payment call finishes.
+         * With server.tomcat.threads.max=5 and 10 concurrent Postman users, the extra requests wait for a free thread.
          */
-        List<String> responses = IntStream.rangeClosed(1, calls)
-                .mapToObj(callNumber -> restTemplate.getForObject(url + "&callNumber=" + callNumber, String.class))
-                .toList();
+        String paymentResponse = restTemplate.getForObject(paymentUrl(delayMs), String.class);
 
+        return buildResponse("REST_TEMPLATE_BLOCKING", delayMs, startedAt, requestThread, paymentResponse);
+    }
+
+    public CompletableFuture<ThreadPoolDemoResponse> callSlowPaymentWithCompletableFuture(
+            long delayMs,
+            String requestThread) {
         /*
-         * SOLUTION 1: CompletableFuture with a bounded executor.
+         * SOLUTION 1: WebClient Mono converted to CompletableFuture.
          *
-         * Uncomment this block and comment the PROBLEM block above.
-         * This keeps slow payment IO off the servlet request thread and limits concurrency with a dedicated pool.
+         * The controller returns CompletableFuture, so Spring MVC releases the incoming Tomcat request thread.
+         * WebClient performs the outbound HTTP call using non-blocking IO, and toFuture() adapts the Mono
+         * for APIs or teams that prefer CompletableFuture.
          */
-        // List<CompletableFuture<String>> futures = IntStream.rangeClosed(1, calls)
-        //         .mapToObj(callNumber -> CompletableFuture.supplyAsync(
-        //                 () -> restTemplate.getForObject(url + "&callNumber=" + callNumber, String.class),
-        //                 paymentDemoExecutor))
-        //         .toList();
-        // List<String> responses = futures.stream()
-        //         .map(CompletableFuture::join)
-        //         .toList();
+        Instant startedAt = Instant.now();
+        return webClient.get()
+                .uri(paymentUrl(delayMs))
+                .retrieve()
+                .bodyToMono(String.class)
+                .timeout(Duration.ofSeconds(60))
+                .map(paymentResponse -> buildResponse("COMPLETABLE_FUTURE_FROM_WEB_CLIENT", delayMs, startedAt,
+                        requestThread, paymentResponse))
+                .toFuture();
+    }
+
+    public Mono<ThreadPoolDemoResponse> callSlowPaymentWithWebClient(long delayMs, String requestThread) {
+        Instant startedAt = Instant.now();
 
         /*
          * SOLUTION 2: WebClient.
          *
-         * Uncomment this block and comment the PROBLEM block above.
-         * WebClient uses non-blocking IO for the outbound calls. The final block() is kept here only because
-         * this MVC endpoint returns a normal response object. In a reactive controller, return Mono/Flux directly.
+         * WebClient uses non-blocking IO for the outbound HTTP call.
+         * The controller returns Mono, so Spring MVC also uses async request processing for this response.
          */
-        // List<CompletableFuture<String>> futures = IntStream.rangeClosed(1, calls)
-        //         .mapToObj(callNumber -> webClient.get()
-        //                 .uri(url + "&callNumber=" + callNumber)
-        //                 .retrieve()
-        //                 .bodyToMono(String.class)
-        //                 .timeout(Duration.ofSeconds(10))
-        //                 .toFuture())
-        //         .toList();
-        // List<String> responses = futures.stream()
-        //         .map(CompletableFuture::join)
-        //         .toList();
+        return webClient.get()
+                .uri(paymentUrl(delayMs))
+                .retrieve()
+                .bodyToMono(String.class)
+                .timeout(Duration.ofSeconds(60))
+                .map(paymentResponse -> buildResponse("WEB_CLIENT_NON_BLOCKING", delayMs, startedAt, requestThread,
+                        paymentResponse));
+    }
 
+    private String paymentUrl(long delayMs) {
+        return paymentBaseUrl + "/api/demo/payments/slow?delayMs=" + delayMs + "&callNumber=1";
+    }
+
+    private ThreadPoolDemoResponse buildResponse(
+            String strategy,
+            long delayMs,
+            Instant startedAt,
+            String requestThread,
+            String paymentResponse) {
         long durationMs = Duration.between(startedAt, Instant.now()).toMillis();
-        return new ThreadPoolDemoResponse(calls, delayMs, durationMs, Thread.currentThread().getName(), responses);
+        return new ThreadPoolDemoResponse(
+                strategy,
+                delayMs,
+                durationMs,
+                requestThread,
+                Thread.currentThread().getName(),
+                paymentResponse);
     }
 
     public record ThreadPoolDemoResponse(
-            int calls,
+            String strategy,
             long paymentDelayMs,
             long totalDurationMs,
-            String handledByThread,
-            List<String> paymentResponses) {
+            String requestThread,
+            String executionThread,
+            String paymentResponse) {
     }
 }

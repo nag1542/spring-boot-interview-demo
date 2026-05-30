@@ -19,6 +19,13 @@ spring:
       host: localhost
       port: 6379
 
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
+    threads:
+      max: 5
+
 app:
   jwt:
     secret: 1234567890123456789012345678901234567890
@@ -29,6 +36,8 @@ app:
     payment-base-url: http://localhost:8080
 
 management:
+  server:
+    port: 8081
   endpoints:
     web:
       exposure:

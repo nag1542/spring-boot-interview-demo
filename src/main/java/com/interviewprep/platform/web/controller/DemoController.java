@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequiredArgsConstructor
@@ -64,11 +66,25 @@ public class DemoController {
                 "thread", Thread.currentThread().getName());
     }
 
-    
-    @GetMapping("/api/demo/thread-pool-exhaustion/payments")
-    public ThreadPoolExhaustionDemoService.ThreadPoolDemoResponse threadPoolExhaustionDemo(
-            @RequestParam(defaultValue = "5") int calls,
+    @GetMapping("/api/demo/thread-pool-exhaustion/payments/rest-template")
+    public ThreadPoolExhaustionDemoService.ThreadPoolDemoResponse restTemplateThreadPoolExhaustionDemo(
             @RequestParam(defaultValue = "2000") long delayMs) {
-        return threadPoolExhaustionDemoService.callSlowPayments(calls, delayMs);
+        return threadPoolExhaustionDemoService.callSlowPaymentWithRestTemplate(delayMs,
+                Thread.currentThread().getName());
     }
+
+    @GetMapping("/api/demo/thread-pool-exhaustion/payments/completable-future")
+    public CompletableFuture<ThreadPoolExhaustionDemoService.ThreadPoolDemoResponse> completableFutureThreadPoolDemo(
+            @RequestParam(defaultValue = "2000") long delayMs) {
+        return threadPoolExhaustionDemoService.callSlowPaymentWithCompletableFuture(delayMs,
+                Thread.currentThread().getName());
+    }
+
+    @GetMapping("/api/demo/thread-pool-exhaustion/payments/webclient")
+    public Mono<ThreadPoolExhaustionDemoService.ThreadPoolDemoResponse> webClientThreadPoolDemo(
+            @RequestParam(defaultValue = "2000") long delayMs) {
+        return threadPoolExhaustionDemoService.callSlowPaymentWithWebClient(delayMs,
+                Thread.currentThread().getName());
+    }
+
 }
