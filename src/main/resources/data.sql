@@ -1,0 +1,11 @@
+INSERT IGNORE INTO users (id, email, password, full_name) VALUES (1,'admin@prep.com','$2a$10$Q7v3YJ7PNfWdhN8aB3nkxO5xYYtB8AJhDigw1VE3DybZ0SqnX5nQ2','Platform Admin');
+INSERT IGNORE INTO users (id, email, password, full_name) VALUES (2,'alice@prep.com','$2a$10$Q7v3YJ7PNfWdhN8aB3nkxO5xYYtB8AJhDigw1VE3DybZ0SqnX5nQ2','Alice Learner');
+INSERT IGNORE INTO users (id, email, password, full_name) VALUES (3,'bob@prep.com','$2a$10$Q7v3YJ7PNfWdhN8aB3nkxO5xYYtB8AJhDigw1VE3DybZ0SqnX5nQ2','Bob Developer');
+INSERT IGNORE INTO user_roles (user_id, role) VALUES (1,'ROLE_ADMIN');
+INSERT IGNORE INTO user_roles (user_id, role) VALUES (2,'ROLE_USER');
+INSERT IGNORE INTO user_roles (user_id, role) VALUES (3,'ROLE_USER');
+INSERT IGNORE INTO products (id, name, price, stock) VALUES (1,'Spring Security Deep Dive',49.99,200);
+INSERT IGNORE INTO orders (id, customer_email, total_amount, created_at, user_id) VALUES (1,'admin@prep.com',49.99,CURRENT_TIMESTAMP,1);
+INSERT IGNORE INTO orders (id, customer_email, total_amount, created_at, user_id) VALUES (2,'alice@prep.com',99.98,CURRENT_TIMESTAMP,2);
+INSERT IGNORE INTO orders (id, customer_email, total_amount, created_at, user_id) VALUES (3,'alice@prep.com',149.97,CURRENT_TIMESTAMP,2);
+INSERT IGNORE INTO orders (id, customer_email, total_amount, created_at, user_id) VALUES (4,'bob@prep.com',49.99,CURRENT_TIMESTAMP,3);
