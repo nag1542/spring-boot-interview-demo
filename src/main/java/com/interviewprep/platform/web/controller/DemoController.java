@@ -1,6 +1,7 @@
 package com.interviewprep.platform.web.controller;
 
 import com.interviewprep.platform.service.NPlusOneDemoService;
+import com.interviewprep.platform.service.HeapPressureDemoService;
 import com.interviewprep.platform.service.ThreadPoolExhaustionDemoService;
 import com.interviewprep.platform.web.dto.UserDtos;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 public class DemoController {
     private final NPlusOneDemoService nPlusOneDemoService;
     private final ThreadPoolExhaustionDemoService threadPoolExhaustionDemoService;
+    private final HeapPressureDemoService heapPressureDemoService;
 
     @GetMapping("/api/demo/public")
     public Map<String, String> publicAccess() {
@@ -85,6 +87,19 @@ public class DemoController {
             @RequestParam(defaultValue = "2000") long delayMs) {
         return threadPoolExhaustionDemoService.callSlowPaymentWithWebClient(delayMs,
                 Thread.currentThread().getName());
+    }
+
+    @GetMapping("/api/demo/heap-pressure/products")
+    public HeapPressureDemoService.HeapPressureResponse loadProductsHeapPressureDemo(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        return heapPressureDemoService.exportProductsWithFindAll(page, size);
+    }
+
+    @GetMapping("/api/demo/heap-pressure/object-churn")
+    public HeapPressureDemoService.HeapPressureResponse objectChurnHeapPressureDemo(
+            @RequestParam(defaultValue = "50000") int lines) {
+        return heapPressureDemoService.createObjectsInTightLoop(lines);
     }
 
 }

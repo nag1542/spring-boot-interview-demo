@@ -679,6 +679,136 @@
           }
         },
         {
+          "name": "Heap Pressure - Load Products",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/demo/heap-pressure/products?page=0&size=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "demo",
+                "heap-pressure",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Demonstrates loading an entire table into memory. Switch the code in HeapPressureDemoService to compare findAll() with paginated processing."
+          }
+        },
+        {
+          "name": "Heap Pressure - Object Churn",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/demo/heap-pressure/object-churn?lines=50000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "demo",
+                "heap-pressure",
+                "object-churn"
+              ],
+              "query": [
+                {
+                  "key": "lines",
+                  "value": "50000"
+                }
+              ]
+            },
+            "description": "Demonstrates product report line creation inside a tight loop. Watch JVM memory and GC metrics before and after this request."
+          }
+        },
+        {
+          "name": "Actuator - JVM Heap Used Metric",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{actuatorBaseUrl}}/actuator/metrics/jvm.memory.used",
+              "host": [
+                "{{actuatorBaseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "metrics",
+                "jvm.memory.used"
+              ]
+            },
+            "description": "Shows JVM memory usage. In a metrics backend, filter by tag area=heap for heap-only memory."
+          }
+        },
+        {
+          "name": "Actuator - JVM GC Pause Metric",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{actuatorBaseUrl}}/actuator/metrics/jvm.gc.pause",
+              "host": [
+                "{{actuatorBaseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "metrics",
+                "jvm.gc.pause"
+              ]
+            },
+            "description": "Shows GC pause count and duration distribution."
+          }
+        },
+        {
           "name": "Actuator - Tomcat Busy Threads Metric",
           "request": {
             "auth": {

@@ -77,6 +77,8 @@ src/main/java/com/interviewprep/platform
 | Demo | GET | `/api/demo/thread-pool-exhaustion/payments/rest-template` | Authenticated |
 | Demo | GET | `/api/demo/thread-pool-exhaustion/payments/completable-future` | Authenticated |
 | Demo | GET | `/api/demo/thread-pool-exhaustion/payments/webclient` | Authenticated |
+| Demo | GET | `/api/demo/heap-pressure/products` | Authenticated |
+| Demo | GET | `/api/demo/heap-pressure/object-churn` | Authenticated |
 
 Use the JWT access token returned by login/register as:
 
@@ -166,6 +168,7 @@ Important metrics to watch:
 - `tomcat.threads.busy`: servlet thread pool pressure and exhaustion risk
 - `jdbc.connections.active`: database connection pool usage
 - `jvm.memory.used`: JVM memory pressure
+- `jvm.gc.pause`: garbage collection pause count and duration
 - `jvm.threads.live`: thread growth and leak detection
 - `process.cpu.usage`: process-level CPU usage
 - `system.cpu.usage`: host-level CPU usage
@@ -319,6 +322,37 @@ While Postman is running concurrent requests, check:
 GET http://localhost:8081/actuator/metrics/tomcat.threads.busy
 GET http://localhost:8081/actuator/metrics/tomcat.threads.current
 ```
+
+## JVM Heap Pressure And GC Pause Demo
+
+Use these endpoints to demonstrate heap pressure and GC pauses:
+
+```text
+GET /api/demo/heap-pressure/products?page=0&size=100
+GET /api/demo/heap-pressure/object-churn?lines=50000
+```
+
+How to check heap and GC through actuator:
+
+```text
+GET http://localhost:8081/actuator/metrics/jvm.memory.used
+GET http://localhost:8081/actuator/metrics/jvm.memory.committed
+GET http://localhost:8081/actuator/metrics/jvm.memory.max
+GET http://localhost:8081/actuator/metrics/jvm.gc.pause
+GET http://localhost:8081/actuator/metrics/jvm.gc.memory.allocated
+GET http://localhost:8081/actuator/metrics/jvm.gc.memory.promoted
+```
+
+What to explain:
+
+- `jvm.memory.used`: how much heap/non-heap memory is currently used. Filter by tags such as `area=heap` when inspecting in a metrics backend.
+- `jvm.gc.pause`: GC pause count and total/max pause time. If this rises during a request, the JVM is spending time reclaiming memory.
+- `jvm.gc.memory.allocated`: allocation rate. Object-heavy loops push this up quickly.
+- `jvm.gc.memory.promoted`: objects surviving young GC and moving toward old generation.
+
+Problem pattern 1 is implemented in `HeapPressureDemoService.exportProductsWithFindAll(...)`: it uses `productRepository.findAll()` and maps every product to an export DTO in memory. The commented fix uses `productRepository.findAll(PageRequest.of(page, size))` so the export loads one page of products at a time.
+
+Problem pattern 2 is implemented in `HeapPressureDemoService.createObjectsInTightLoop(...)`: it builds product report lines inside a tight loop and retains all lines until the response is built. The commented fix pre-sizes the list and uses an explicitly sized `StringBuilder`; `String.format(...)` is more readable for normal code paths, but usually heavier in hot loops.
 
 ## Architecture
 
