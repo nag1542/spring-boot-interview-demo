@@ -12,6 +12,7 @@ Production-ready Spring Boot 3 backend for the Java Interview Prep platform. The
 - Bean validation for request DTOs
 - Global exception handling for consistent API error responses
 - Spring Data JPA persistence with MySQL
+- Transaction management with production-style `@Transactional` boundaries and rollback rule examples
 - Redis dependency and configuration prepared for caching/session-adjacent use cases
 - Swagger/OpenAPI documentation with JWT bearer authentication support
 - Seed data for local development
@@ -57,6 +58,7 @@ src/main/java/com/interviewprep/platform
 - Order: authenticated order creation and order lookup
 - Payment: domain-ready module for future payment workflows
 - Audit: domain-ready module for future audit logging and compliance trails
+- Transaction Interview Prep: user creation plus audit logging examples for commit, rollback, checked exceptions, and `noRollbackFor`
 
 ## API Overview
 
@@ -79,12 +81,34 @@ src/main/java/com/interviewprep/platform
 | Demo | GET | `/api/demo/thread-pool-exhaustion/payments/webclient` | Authenticated |
 | Demo | GET | `/api/demo/heap-pressure/products` | Authenticated |
 | Demo | GET | `/api/demo/heap-pressure/object-churn` | Authenticated |
+| Transaction Demo | POST | `/api/demo/transactions/module-1/success` | Authenticated |
+| Transaction Demo | POST | `/api/demo/transactions/module-1/audit-failure` | Authenticated |
+| Transaction Demo | POST | `/api/demo/transactions/module-2/checked-exception` | Authenticated |
+| Transaction Demo | POST | `/api/demo/transactions/module-2/no-rollback-for` | Authenticated |
+| Transaction Demo | POST | `/api/demo/transactions/module-3/read-only-query` | Authenticated |
+| Transaction Demo | POST | `/api/demo/transactions/module-3/read-only-write-pitfall` | Authenticated |
+| Transaction Demo | POST | `/api/demo/transactions/traps/self-invocation` | Authenticated |
+| Transaction Demo | POST | `/api/demo/transactions/traps/private-method` | Authenticated |
+| Transaction Demo | POST | `/api/demo/transactions/traps/swallowed-exception` | Authenticated |
 
 Use the JWT access token returned by login/register as:
 
 ```text
 Authorization: Bearer <access-token>
 ```
+
+Common API response shape:
+
+```json
+{
+  "status": "SUCCESS",
+  "error": false,
+  "errorMessage": null,
+  "payload": {}
+}
+```
+
+Global exception responses use the same shape with `error=true` and `payload=null`.
 
 ## Local Prerequisites
 
@@ -253,6 +277,307 @@ sequenceDiagram
   JwtFilter->>Controller: Continue request
   Controller-->>Client: API response
 ```
+
+## Transaction Interview Prep
+
+The transaction endpoints use realistic service-layer patterns and require a JWT. The authenticated user drives order-oriented examples, and request bodies provide only the business input needed for the use case, such as `productId`.
+
+Important production guidance:
+
+- Put `@Transactional` on service-layer business methods, not on controllers.
+- Keep one transaction boundary around one business use case.
+- Do not swallow exceptions inside transactional methods unless you deliberately handle rollback state.
+- Prefer explicit database constraints and validation for data integrity.
+- Use Flyway or Liquibase for schema changes in real environments.
+- Treat `noRollbackFor` as a business decision, not a general error-handling shortcut.
+
+### Module 1 - Transaction Fundamentals
+
+Success case:
+
+```text
+POST /api/demo/transactions/module-1/success
+```
+
+What happens:
+
+- The service creates a user.
+- The service creates a `user_audit_logs` row for that user.
+- The method returns normally.
+- Spring commits both writes together.
+
+Interview explanation:
+
+`@Transactional` starts a transaction before the service method runs. If the method completes without an exception that requires rollback, the transaction manager commits. Both records become visible in the database as one atomic unit.
+
+Failure and rollback case:
+
+```text
+POST /api/demo/transactions/module-1/audit-failure
+```
+
+What happens:
+
+- The service creates a user first.
+- The service then attempts to create an audit row with a missing required `eventType`.
+- JPA flushes the invalid audit row and raises a runtime persistence exception.
+- Spring rolls back the whole transaction, including the user insert.
+
+Interview explanation:
+
+A transaction is atomic. Even though the user insert happened before the audit failure, it was not independently committed. Because both writes were part of the same transaction, the runtime exception causes the entire unit of work to roll back.
+
+### Module 2 - Rollback Rules
+
+Checked exception default behavior:
+
+```text
+POST /api/demo/transactions/module-2/checked-exception
+```
+
+What happens:
+
+- The service creates a user.
+- The service creates an audit row.
+- The service throws a checked `AuditNotificationException`.
+- Spring commits by default because checked exceptions do not trigger rollback unless configured.
+
+Interview explanation:
+
+By default, Spring rolls back on `RuntimeException` and `Error`, but not on checked exceptions. If a checked exception should roll back a transaction, configure it explicitly:
+
+```java
+@Transactional(rollbackFor = AuditNotificationException.class)
+```
+
+Explicit no-rollback behavior:
+
+```text
+POST /api/demo/transactions/module-2/no-rollback-for
+```
+
+What happens:
+
+- The service creates a user.
+- The service creates an audit row.
+- The service throws `IllegalStateException`.
+- The transaction still commits because the method uses `noRollbackFor`.
+
+Code concept:
+
+```java
+@Transactional(noRollbackFor = IllegalStateException.class)
+```
+
+Interview explanation:
+
+Runtime exceptions normally roll back. `noRollbackFor` overrides that behavior for a specific exception type. Use it only when the exception represents a non-critical business outcome and committing the data is still correct.
+
+### Module 3 - Read-Only Transactions
+
+Correct read-only use case:
+
+```text
+POST /api/demo/transactions/module-3/read-only-query
+```
+
+What happens:
+
+- The service method only reads data.
+- The method is annotated with `@Transactional(readOnly = true)`.
+- The response returns aggregate counts for users and audit logs.
+
+Code concept:
+
+```java
+@Transactional(readOnly = true)
+public ReadOnlyTransactionResult readOnlySummary() {
+    return ReadOnlyTransactionResult.queryOnly(
+            userRepository.count(),
+            userAuditLogRepository.count(),
+            "This service method only reads data...");
+}
+```
+
+When to use:
+
+- Query-only service methods.
+- Reporting or lookup flows where no data should be changed.
+- Read paths that need a consistent transactional persistence context.
+- Performance-sensitive reads where the JPA provider can skip unnecessary dirty checking work.
+
+Interview explanation:
+
+`readOnly = true` communicates that the transaction is intended only for reads. With Hibernate, Spring can optimize the persistence context for read access. It also documents intent for other developers reviewing the service layer.
+
+Read-only pitfall:
+
+```text
+POST /api/demo/transactions/module-3/read-only-write-pitfall
+```
+
+What happens:
+
+- The endpoint first creates a baseline user in a normal write transaction.
+- A second service method opens `@Transactional(readOnly = true)`.
+- That method loads the user, changes `fullName`, and explicitly calls `saveAndFlush`.
+- The verification step checks whether the changed name was committed.
+
+Code concept:
+
+```java
+@Transactional(readOnly = true)
+public ReadOnlyTransactionResult updateUserInsideReadOnlyTransaction(String email) {
+    User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
+    user.setFullName("Updated inside read-only transaction");
+    userRepository.saveAndFlush(user);
+    return ...
+}
+```
+
+Production warning:
+
+`readOnly = true` is not a security feature and not a replacement for validation, authorization, or code review. Treat it as an optimization and intent marker. Provider and database behavior can vary, especially when code performs explicit writes. If a method must never change data, keep write repositories out of that flow and enforce the rule through architecture, permissions, and tests.
+
+Interview explanation:
+
+A common misconception is that `readOnly = true` always blocks writes. In real applications, it should not be relied on as a hard guard. The production-grade habit is to design read methods so they do not call save methods at all.
+
+### Transactional Traps And Solutions
+
+These endpoints use an order creation flow with three business steps:
+
+- create an `orders` row
+- reduce product inventory
+- write an audit log
+
+That is a realistic place where transaction mistakes become expensive. A failed audit step should not leave a committed order and reduced stock unless the business explicitly wants that outcome.
+
+#### Trap 1 - Self Invocation Problem
+
+```text
+POST /api/demo/transactions/traps/self-invocation
+```
+
+Request body:
+
+```json
+{
+  "productId": 1
+}
+```
+
+Misconception:
+
+```java
+public void outerMethod() {
+    createOrderInventoryAndAuditWithTransaction(...);
+}
+
+@Transactional
+public void createOrderInventoryAndAuditWithTransaction(...) {
+    // create order, update inventory, write audit
+}
+```
+
+What goes wrong:
+
+The outer method calls another method on the same object. Spring's transaction advice is proxy-based, so this internal call does not pass through the Spring proxy. The `@Transactional` annotation on the inner method is bypassed.
+
+Production solution:
+
+- Put the transactional operation on the external service entry method, or
+- Move the transactional method to another Spring bean and call that bean, or
+- Use a deliberate orchestration service that calls a separate transactional domain service.
+
+Interview phrase:
+
+Self invocation bypasses Spring AOP proxies, so `@Transactional` is not applied.
+
+#### Trap 2 - Private Method
+
+```text
+POST /api/demo/transactions/traps/private-method
+```
+
+Request body:
+
+```json
+{
+  "productId": 1
+}
+```
+
+Misconception:
+
+```java
+@Transactional
+private void createOrderInventoryAndAudit(...) {
+    // create order, update inventory, write audit
+}
+```
+
+What goes wrong:
+
+Private methods cannot be proxied by Spring's proxy-based AOP transaction mechanism. The annotation is ignored for transaction boundary purposes.
+
+Production solution:
+
+- Put `@Transactional` on a public/protected service method invoked from outside the bean.
+- Keep private methods as implementation helpers inside an already transactional public method.
+
+Interview phrase:
+
+`@Transactional` belongs on service methods that Spring can intercept through a proxy.
+
+#### Trap 3 - Swallowed Exceptions And Duplicate Orders
+
+```text
+POST /api/demo/transactions/traps/swallowed-exception
+```
+
+Request body:
+
+```json
+{
+  "productId": 1
+}
+```
+
+Misconception:
+
+```java
+@Transactional
+public boolean placeOrder(...) {
+    createOrder();
+    reduceInventory();
+    try {
+        writeAudit();
+    } catch (RuntimeException ex) {
+        return false;
+    }
+}
+```
+
+What goes wrong:
+
+Runtime exceptions roll back only when they escape the transactional method. If the method catches the exception and returns normally, Spring commits the transaction. If the client or caller thinks the order failed because audit/payment reporting failed and retries the request, another order or charge can be created.
+
+Production solution:
+
+- Let rollback-worthy exceptions escape the transactional method.
+- Convert low-level exceptions into meaningful runtime business exceptions and rethrow them.
+- If a method must return an error result instead of throwing, explicitly mark rollback-only:
+
+```java
+TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+```
+
+- For payment/order workflows, also use idempotency keys or unique request IDs so retries cannot create duplicate orders.
+
+Interview phrase:
+
+Spring commits when a transactional method returns normally. Catching an exception can accidentally turn a rollback into a commit.
 
 ## N+1 Query Demo
 

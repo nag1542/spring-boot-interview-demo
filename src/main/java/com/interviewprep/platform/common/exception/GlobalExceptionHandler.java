@@ -1,28 +1,29 @@
 package com.interviewprep.platform.common.exception;
 
+import com.interviewprep.platform.web.dto.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Map;
-
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<?> validation(MethodArgumentNotValidException ex) {
-        return ResponseEntity.badRequest().body(Map.of("error", "validation_failed", "message", ex.getMessage()));
+    public ResponseEntity<ApiResponse<Void>> validation(MethodArgumentNotValidException ex) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure("VALIDATION_FAILED", ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<?> badRequest(IllegalArgumentException ex) {
-        return ResponseEntity.badRequest().body(Map.of("error", "bad_request", "message", ex.getMessage()));
+    public ResponseEntity<ApiResponse<Void>> badRequest(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure("BAD_REQUEST", ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<?> generic(Exception ex) {
+    public ResponseEntity<ApiResponse<Void>> generic(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "server_error", "message", ex.getMessage()));
+                .body(ApiResponse.failure("SERVER_ERROR", ex.getMessage()));
     }
 }

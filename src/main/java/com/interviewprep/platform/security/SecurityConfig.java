@@ -1,5 +1,6 @@
 package com.interviewprep.platform.security;
 
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +25,7 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/auth/**", "/api/demo/public", "/api/demo/payments/slow","/api/demo/n-plus-one/users-orders","/api/demo/users/**",
                         "/api/demo/thread-pool-exhaustion/**","/api/demo/heap-pressure/**",
                                 "/swagger-ui/**", "/v3/api-docs/**", "/actuator/health/**","/actuator/metrics/**","/actuator/threaddump/**")
