@@ -28,6 +28,7 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/auth/**", "/api/demo/public", "/api/demo/payments/slow","/api/demo/n-plus-one/users-orders","/api/demo/users/**",
                         "/api/demo/thread-pool-exhaustion/**","/api/demo/heap-pressure/**",
+                                "/api/demo/aop/**",
                                 "/swagger-ui/**", "/v3/api-docs/**", "/actuator/health/**","/actuator/metrics/**","/actuator/threaddump/**")
                         .permitAll()
                         .anyRequest().authenticated())

@@ -455,6 +455,36 @@
           }
         },
         {
+          "name": "AOP - Log Execution Time",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/demo/aop/around/log-execution-time?region=south&dayCount=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "demo",
+                "aop",
+                "around",
+                "log-execution-time"
+              ],
+              "query": [
+                {
+                  "key": "region",
+                  "value": "south"
+                },
+                {
+                  "key": "dayCount",
+                  "value": "30"
+                }
+              ]
+            },
+            "description": "Public AOP demo that measures execution time around a monthly sales report workflow."
+          }
+        },
+        {
           "name": "Admin Demo Endpoint",
           "request": {
             "auth": {
