@@ -59,6 +59,7 @@ src/main/java/com/interviewprep/platform
 - Payment: domain-ready module for future payment workflows
 - Audit: domain-ready module for future audit logging and compliance trails
 - Transaction Interview Prep: user creation plus audit logging examples for commit, rollback, checked exceptions, and `noRollbackFor`
+- AOP Interview Prep: real-world `@Before`, `@After`, and `@Around` advice examples
 
 ## API Overview
 
@@ -81,6 +82,10 @@ src/main/java/com/interviewprep/platform
 | Demo | GET | `/api/demo/thread-pool-exhaustion/payments/webclient` | Authenticated |
 | Demo | GET | `/api/demo/heap-pressure/products` | Authenticated |
 | Demo | GET | `/api/demo/heap-pressure/object-churn` | Authenticated |
+| AOP Demo | POST | `/api/demo/aop/before/loan-application` | Public |
+| AOP Demo | POST | `/api/demo/aop/after/support-ticket-close` | Public |
+| AOP Demo | GET | `/api/demo/aop/around/supplier-price-quote` | Public |
+| AOP Demo | GET | `/api/demo/aop/around/log-execution-time` | Public |
 | Transaction Demo | POST | `/api/demo/transactions/module-1/success` | Authenticated |
 | Transaction Demo | POST | `/api/demo/transactions/module-1/audit-failure` | Authenticated |
 | Transaction Demo | POST | `/api/demo/transactions/module-2/checked-exception` | Authenticated |
@@ -109,6 +114,61 @@ Common API response shape:
 ```
 
 Global exception responses use the same shape with `error=true` and `payload=null`.
+
+## AOP Interview Prep
+
+These endpoints demonstrate practical Spring AOP advice types with a response trace showing which advice ran.
+The same requests are also included in the Postman collection under the Demo section.
+
+### Before Advice - Fraud/Risk Pre-Check
+
+```text
+POST /api/demo/aop/before/loan-application
+```
+
+Request body:
+
+```json
+{
+  "customerId": "CUST-101",
+  "requestedAmount": 250000,
+  "creditScore": 720
+}
+```
+
+Real-world use case:
+
+Before a bank creates a loan application, a cross-cutting risk policy validates the requested amount and credit score. If the amount is above the auto-approval limit or the score is too low, the advice blocks the call before business logic runs.
+
+### After Advice - Customer Notification
+
+```text
+POST /api/demo/aop/after/support-ticket-close?ticketId=TICKET-1001
+```
+
+Real-world use case:
+
+After a support ticket workflow finishes, the advice queues a customer notification. This is a good fit for `@After` because the follow-up should happen after the service method completes.
+
+### Around Advice - Timing And Cache
+
+```text
+GET /api/demo/aop/around/supplier-price-quote?sku=LAPTOP-PRO&quantity=2
+```
+
+Real-world use case:
+
+An e-commerce procurement flow calls a supplier pricing workflow. `@Around` measures the call and caches repeat quote requests, so the second call for the same SKU and quantity returns quickly from the advice without executing the service method again.
+
+### Around Advice - Execution Time Logging
+
+```text
+GET /api/demo/aop/around/log-execution-time?region=south&dayCount=30
+```
+
+Real-world use case:
+
+An analytics or reporting service often needs timing around a method without changing the method itself. `@Around` is a natural fit because it can start a timer before the call, proceed with the report generation, and log the elapsed time afterward.
 
 ## Local Prerequisites
 
