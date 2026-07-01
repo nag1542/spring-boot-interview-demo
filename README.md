@@ -95,6 +95,12 @@ src/main/java/com/interviewprep/platform
 | Transaction Demo | POST | `/api/demo/transactions/traps/self-invocation` | Authenticated |
 | Transaction Demo | POST | `/api/demo/transactions/traps/private-method` | Authenticated |
 | Transaction Demo | POST | `/api/demo/transactions/traps/swallowed-exception` | Authenticated |
+| Async Internals | POST | `/api/demo/async-internals/place-order-notify` | Authenticated |
+| Async Internals | POST | `/api/demo/async-internals/self-invocation` | Authenticated |
+| Async Internals | POST | `/api/demo/async-internals/exception-handler` | Authenticated |
+| Async Internals | POST | `/api/demo/async-internals/exception-completable-future` | Authenticated |
+| Async Internals | POST | `/api/demo/async-internals/threadpool/default-issue` | Authenticated |
+| Async Internals | POST | `/api/demo/async-internals/threadpool/custom` | Authenticated |
 
 Use the JWT access token returned by login/register as:
 
@@ -707,6 +713,171 @@ While Postman is running concurrent requests, check:
 GET http://localhost:8081/actuator/metrics/tomcat.threads.busy
 GET http://localhost:8081/actuator/metrics/tomcat.threads.current
 ```
+
+## Async Internals Demo
+
+These endpoints show how Spring `@Async` works internally. They use a realistic order flow: place an order on the request thread, then send a notification asynchronously.
+
+All async internals endpoints require a JWT:
+
+```text
+Authorization: Bearer <access-token>
+```
+
+### Successful Async Notification
+
+```text
+POST /api/demo/async-internals/place-order-notify
+```
+
+Request body:
+
+```json
+{
+  "productId": 1
+}
+```
+
+What to observe:
+
+- The order is created on the servlet request thread.
+- Notification runs in `AsyncNotificationService`.
+- Console prints a thread like `notification-async-1`.
+- The API payload includes both request and notification thread names.
+
+Interview explanation:
+
+`@Async` works when Spring calls the method through a proxy. In this example, `AsyncOrderDemoService` calls a different Spring bean, `AsyncNotificationService`, so the async proxy is applied.
+
+### Async Self Invocation Trap
+
+```text
+POST /api/demo/async-internals/self-invocation
+```
+
+Request body:
+
+```json
+{
+  "productId": 1
+}
+```
+
+What to observe:
+
+- The method is annotated with `@Async`.
+- It is called from another method in the same class.
+- The observed thread is the same as the request thread.
+
+Interview explanation:
+
+Self invocation bypasses Spring's proxy. The annotation exists, but Spring never intercepts the call, so the method runs synchronously.
+
+Production solution:
+
+- Move async work to another Spring bean.
+- Inject and call that bean from the orchestration service.
+- Keep async method boundaries public and proxy-invoked.
+
+### Async Exception Handler
+
+```text
+POST /api/demo/async-internals/exception-handler
+```
+
+Request body:
+
+```json
+{
+  "productId": 1
+}
+```
+
+What to observe:
+
+- The endpoint returns successfully after dispatching notification.
+- The async notification method throws an exception.
+- `AsyncUncaughtExceptionHandler` prints the failure in the console.
+
+Interview explanation:
+
+Exceptions from `void @Async` methods do not return to the caller thread. Use `AsyncUncaughtExceptionHandler` for centralized handling. For async methods returning `CompletableFuture`, handle failures through the future pipeline.
+
+### Async Exception Handling With CompletableFuture
+
+```text
+POST /api/demo/async-internals/exception-completable-future
+```
+
+Request body:
+
+```json
+{
+  "productId": 1
+}
+```
+
+What to observe:
+
+- The async notification method returns `CompletableFuture<String>`.
+- The notification still fails on the async thread.
+- The caller observes the failure through `join()` as a `CompletionException`.
+- The API response explains that `exceptionally(...)`, `handle(...)`, `get()`, or `join()` can be used to handle the failure.
+
+Interview explanation:
+
+For `void @Async`, failures go to `AsyncUncaughtExceptionHandler`. For `CompletableFuture` async methods, the exception is captured by the returned future. This is usually better when the caller needs to react to success or failure.
+
+### Default Threadpool Issue
+
+```text
+POST /api/demo/async-internals/threadpool/default-issue
+```
+
+Request body:
+
+```json
+{
+  "tasks": 10
+}
+```
+
+What to observe:
+
+- The demo uses `SimpleAsyncTaskExecutor`.
+- Console prints thread names like `simple-async-demo-1`, `simple-async-demo-2`, and so on.
+- This executor creates new threads rather than reusing a bounded pool.
+
+Interview explanation:
+
+Relying on an unbounded/simple async executor can create too many threads under load. That increases memory usage, context switching, and failure risk.
+
+### Custom Threadpool Config
+
+```text
+POST /api/demo/async-internals/threadpool/custom
+```
+
+Request body:
+
+```json
+{
+  "tasks": 10
+}
+```
+
+What to observe:
+
+- The demo uses a bounded `ThreadPoolTaskExecutor`.
+- Console prints thread names like `notification-async-1`.
+- Threads are reused by the configured pool.
+
+Production guidance:
+
+- Define dedicated executors for important async workloads.
+- Set core size, max size, queue capacity, and thread name prefix.
+- Monitor queue depth, active threads, and rejected tasks.
+- Do not put critical data consistency work only in fire-and-forget async methods.
 
 ## JVM Heap Pressure And GC Pause Demo
 
