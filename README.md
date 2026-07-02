@@ -101,6 +101,13 @@ src/main/java/com/interviewprep/platform
 | Async Internals | POST | `/api/demo/async-internals/exception-completable-future` | Authenticated |
 | Async Internals | POST | `/api/demo/async-internals/threadpool/default-issue` | Authenticated |
 | Async Internals | POST | `/api/demo/async-internals/threadpool/custom` | Authenticated |
+| Cache Demo | POST | `/api/demo/cache/cacheable` | Authenticated |
+| Cache Demo | POST | `/api/demo/cache/cache-put` | Authenticated |
+| Cache Demo | POST | `/api/demo/cache/cache-evict` | Authenticated |
+| Cache Demo | POST | `/api/demo/cache/unique-key` | Authenticated |
+| Cache Demo | POST | `/api/demo/cache/unless-null` | Authenticated |
+| Cache Demo | POST | `/api/demo/cache/self-invocation` | Authenticated |
+| Cache Demo | POST | `/api/demo/cache/evict-before-invocation` | Authenticated |
 
 Use the JWT access token returned by login/register as:
 
@@ -878,6 +885,192 @@ Production guidance:
 - Set core size, max size, queue capacity, and thread name prefix.
 - Monitor queue depth, active threads, and rejected tasks.
 - Do not put critical data consistency work only in fire-and-forget async methods.
+
+## Cacheable Internals Demo
+
+This module uses Spring's local in-memory `ConcurrentMapCacheManager`. It intentionally does not use Redis, Memcached, or any external cache because the goal is to explain Spring cache annotations locally.
+
+All cache endpoints require a JWT:
+
+```text
+Authorization: Bearer <access-token>
+```
+
+### 1. `@Cacheable` Usage
+
+```text
+POST /api/demo/cache/cacheable
+```
+
+Request body:
+
+```json
+{
+  "productId": 1
+}
+```
+
+What to observe:
+
+- First request: method executes and prints `[CACHEABLE-MISS]`.
+- Second request with the same `productId`: method does not execute.
+- Response field `methodExecuted` tells whether the service body ran for that request.
+
+Interview explanation:
+
+`@Cacheable` checks the cache before invoking the method. If a value exists for the key, Spring returns the cached value and skips the method body.
+
+### 2. `@CachePut`
+
+```text
+POST /api/demo/cache/cache-put
+```
+
+Request body:
+
+```json
+{
+  "productId": 1,
+  "name": "Updated Product Name"
+}
+```
+
+What to observe:
+
+- The method always executes.
+- The database row is updated.
+- The cache entry for `products::1` is replaced with the returned value.
+
+Interview explanation:
+
+`@CachePut` does not skip method execution. It is useful for write paths where the cache should be refreshed after the update.
+
+### 3. `@CacheEvict`
+
+```text
+POST /api/demo/cache/cache-evict
+```
+
+Request body:
+
+```json
+{
+  "productId": 1
+}
+```
+
+What to observe:
+
+- The cache entry is removed after the method completes successfully.
+- A later `@Cacheable` call for the same product executes the method again and reloads from the database.
+
+Interview explanation:
+
+Use `@CacheEvict` when a cached value is no longer trustworthy after a write operation.
+
+### 4. Unique Cache Key Creation
+
+```text
+POST /api/demo/cache/unique-key
+```
+
+Request body:
+
+```json
+{
+  "minPrice": 0,
+  "maxPrice": 500
+}
+```
+
+What to observe:
+
+- The service uses a custom `KeyGenerator`.
+- The key includes method name and input arguments.
+- Repeating the same price range returns from cache.
+
+Interview explanation:
+
+Cache keys must include all inputs that affect the result. Poor keys can return wrong data across users, filters, tenants, or locales.
+
+### 5. Avoid Null Cache Creation With `unless`
+
+```text
+POST /api/demo/cache/unless-null
+```
+
+Request body:
+
+```json
+{
+  "name": "missing-product"
+}
+```
+
+What to observe:
+
+- Missing products return `null` from the cached method.
+- `unless = "#result == null"` prevents caching that null result.
+- Repeating the request executes the method again.
+
+Interview explanation:
+
+Use `unless` when the result should be inspected after method execution before deciding whether to cache it. This is useful for avoiding stale "not found" entries.
+
+### Cache Self Invocation Problem
+
+```text
+POST /api/demo/cache/self-invocation
+```
+
+Request body:
+
+```json
+{
+  "productId": 1
+}
+```
+
+What to observe:
+
+- The service calls a `@Cacheable` method from another method in the same class.
+- Console prints `[CACHE-SELF-INVOCATION-DB-CALL]` every time.
+- Because the log prints every time, the method is not returning from cache.
+
+Interview explanation:
+
+Spring cache annotations are applied through a proxy. When one method calls another method on the same object, the call does not pass through the proxy, so `@Cacheable` is skipped.
+
+Production solution:
+
+- Move the cached method to a separate Spring service and call that bean.
+- Keep cacheable methods on proxy-invoked service boundaries.
+- Avoid relying on annotations for internal `this.method()` calls.
+
+### 6. `@CacheEvict(beforeInvocation = true)`
+
+```text
+POST /api/demo/cache/evict-before-invocation
+```
+
+Request body:
+
+```json
+{
+  "productId": 1
+}
+```
+
+Recommended flow:
+
+1. Call `/api/demo/cache/cacheable` for `productId=1` to populate cache.
+2. Call `/api/demo/cache/evict-before-invocation` for `productId=1`.
+3. The method throws a simulated failure after eviction.
+4. Response shows the cache entry is gone anyway.
+
+Interview explanation:
+
+Normal `@CacheEvict` evicts after successful method completion. `beforeInvocation = true` evicts before the method body runs, so eviction still happens even if the method fails. Use it when stale cache is more dangerous than a temporary cache miss.
 
 ## JVM Heap Pressure And GC Pause Demo
 
